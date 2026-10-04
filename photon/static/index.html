@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ФОТОН — калькулятор прайса (демо)</title>
+<style>
+:root {
+  --bg: #0a0a14; --surface: #14141f; --border: rgba(255,255,255,.09);
+  --text: #e7e9f0; --muted: #a3a8b8; --green: #34d399; --violet: #7c3aed;
+}
+* { box-sizing: border-box; }
+body { margin:0; font-family:'Inter','Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+.wrap { max-width: 960px; margin:0 auto; padding:24px 16px 60px; }
+h1 { font-size:1.5rem; margin:0 0 4px; }
+.badge { display:inline-block; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--green); border:1px solid rgba(52,211,153,.4); border-radius:20px; padding:2px 10px; margin-bottom:10px; }
+.trial { font-size:.85rem; color:var(--muted); margin-bottom:20px; }
+.trial b { color:var(--green); font-variant-numeric: tabular-nums; }
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:16px; }
+label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.06em; }
+input[type=text], input[type=search] { width:100%; background:#0d0d17; color:var(--text);
+  border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:1rem; outline:none; }
+input:focus { border-color:var(--green); }
+.sugg { position:relative; }
+.sugg-list { position:absolute; left:0; right:0; top:100%; z-index:5; background:#10101c; border:1px solid var(--border);
+  border-radius:8px; margin-top:4px; overflow:hidden; display:none; }
+.sugg-item { padding:9px 12px; cursor:pointer; display:flex; justify-content:space-between; gap:12px; }
+.sugg-item.active { background:rgba(52,211,153,.12); }
+.sugg-item .price { color:var(--green); white-space:nowrap; }
+.sugg-item .cat { color:var(--muted); font-size:.78rem; }
+table { width:100%; border-collapse:collapse; margin-top:8px; }
+th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  padding:6px 8px; border-bottom:1px solid var(--border); }
+td { padding:8px; border-bottom:1px solid rgba(255,255,255,.05); font-size:.95rem; }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.qty { width:52px; text-align:center; }
+.row-del { color:#f87171; cursor:pointer; border:none; background:none; font-size:1rem; }
+.total-row td { border-bottom:none; font-size:1.1rem; }
+.total-row .sum { color:var(--green); font-weight:600; }
+.btn { display:inline-flex; align-items:center; gap:8px; border:none; cursor:pointer;
+  padding:10px 22px; border-radius:8px; font-size:.95rem; font-weight:600; color:#fff;
+  background:linear-gradient(90deg,#10b981,var(--violet)); }
+.btn.secondary { background:rgba(255,255,255,.06); border:1px solid var(--border); }
+.cash-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.report { font-size:.9rem; color:var(--muted); }
+.report b { color:var(--text); }
+
+/* Блокировка демо */
+#lock { position:fixed; inset:0; background:rgba(5,5,12,.92); backdrop-filter:blur(6px);
+  display:none; align-items:center; justify-content:center; z-index:100; }
+#lock.show { display:flex; }
+.lock-card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:32px; max-width:460px; width:92%; text-align:center; }
+.lock-card h2 { margin:0 0 8px; font-size:1.25rem; }
+.lock-card p { color:var(--muted); font-size:.92rem; margin:0 0 16px; }
+.mid { background:#0d0d17; color:var(--green); border:1px dashed rgba(52,211,153,.4); border-radius:8px;
+  padding:8px 12px; font-family:ui-monospace,Consolas,monospace; letter-spacing:.06em; margin-bottom:16px;
+  cursor:pointer; user-select:all; }
+.mid small { display:block; color:var(--muted); font-size:.7rem; font-family:inherit; letter-spacing:0; margin-bottom:2px; }
+.lock-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.mailto { color:var(--green); text-decoration:none; font-size:.85rem; display:block; margin-top:14px; }
+.mailto:hover { text-decoration:underline; }
+#lockErr { color:#f87171; font-size:.85rem; min-height:1.2em; margin:8px 0 0; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">Демо-версия</span>
+  <h1>ФОТОН — калькулятор прайса</h1>
+  <div class="trial" id="trialLine">Осталось демо-времени: <b id="trialLeft">—</b></div>
+
+  <div class="panel">
+    <label for="q">Поиск услуги (первые 2 буквы, любая раскладка)</label>
+    <div class="sugg">
+      <input type="search" id="q" placeholder="напр.: пе / gt → Печать фото" autocomplete="off">
+      <div class="sugg-list" id="sugg"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <table id="cart">
+      <thead><tr><th>Услуга</th><th class="num">Цена</th><th class="num">Кол-во</th><th class="num">Сумма</th><th></th></tr></thead>
+      <tbody id="cartBody"></tbody>
+      <tfoot>
+        <tr class="total-row"><td>Итого</td><td></td><td></td><td class="num sum" id="total">0.00</td><td></td></tr>
+      </tfoot>
+    </table>
+    <div class="cash-row">
+      <button class="btn secondary" id="btnCash">Чек → Отчёт (наличные)</button>
+      <button class="btn secondary" id="btnCard">Чек → Отчёт (карта)</button>
+    </div>
+  </div>
+
+  <div class="panel report">
+    <label>Отчёт смены</label>
+    <div>Наличные: <b id="sumCash">0.00</b> · Карта: <b id="sumCard">0.00</b> · Общая сумма: <b id="sumAll">0.00</b></div>
+    <div class="cash-row"><button class="btn secondary" id="btnClear">Очистить отчёт</button></div>
+  </div>
+</div>
+
+<!-- Окно блокировки демо -->
+<div id="lock">
+  <div class="lock-card">
+    <h2>Демо-период завершён</h2>
+    <p>Полная версия активируется лицензионным ключом.<br>Отправьте запрос — ключ придёт на вашу почту.</p>
+    <div class="mid" id="mid" title="Нажмите, чтобы скопировать">
+      <small>Ваш Machine ID (скопируйте в письмо):</small><span id="midVal"></span>
+    </div>
+    <div class="lock-actions">
+      <button class="btn" id="btnMail">Запросить ключ</button>
+    </div>
+    <div>
+      <input type="text" id="keyInput" placeholder="Вставьте ключ: PH-XXXX-XXXX" style="margin-top:16px">
+      <div class="lock-actions" style="margin-top:10px">
+        <button class="btn" id="btnActivate">Активировать</button>
+      </div>
+    </div>
+    <div id="lockErr"></div>
+    <a class="mailto" href="mailto:shrumi@yandex.ru?subject=%D0%97%D0%B0%D0%BF%D1%80%D0%BE%D1%81%20%D0%BA%D0%BB%D1%8E%D1%87%D0%B0%20%D0%A4%D0%9E%D0%A2%D0%9E%D0%9D&body=%D0%9C%D0%B0%D1%88%D0%B8%D0%BD%20ID%3A%20">shrumi@yandex.ru — написать напрямую</a>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toFixed(2);
+
+let cart = [];
+let report = { cash: 0, card: 0 };
+let suggItems = [], suggIdx = -1, lockShown = false, licensed = false;
+
+/* ---------- Триал ---------- */
+function renderState(st) {
+  licensed = !!st.licensed;
+  if (licensed) { $("lock").classList.remove("show"); lockShown = false; return; }
+  const r = st.remaining;
+  if (r <= 0) { showLock(); } else {
+    const m = Math.floor(r / 60), s = r % 60;
+    $("trialLeft").textContent = `${m}:${String(s).padStart(2, "0")}`;
+  }
+}
+async function tickState() {
+  try {
+    const r = await fetch("/api/heartbeat");
+    renderState(await r.json());
+  } catch (e) { /* сервер перезапускается */ }
+}
+function showLock() {
+  if (licensed) return;
+  lockShown = true;
+  $("trialLeft").textContent = "0:00";
+  $("lock").classList.add("show");
+  fetch("/api/state").then(r => r.json()).then(st => {
+    $("midVal").textContent = st.machine_id;
+    const body = "Machine ID: " + st.machine_id;
+    const subj = "Запрос ключа ФОТОН";
+    $("btnMail").onclick = () => {
+      location.href = "mailto:shrumi@yandex.ru?subject=" + encodeURIComponent(subj) +
+        "&body=" + encodeURIComponent(body);
+    };
+    document.querySelector(".mailto").href = "mailto:shrumi@yandex.ru?subject=" +
+      encodeURIComponent(subj) + "&body=" + encodeURIComponent(body);
+  });
+}
+
+/* ---------- Поиск с подсказками ---------- */
+async function doSearch(q) {
+  if (!q.trim()) { $("sugg").style.display = "none"; return; }
+  const r = await fetch("/api/search?q=" + encodeURIComponent(q));
+  suggItems = await r.json();
+  suggIdx = -1;
+  const box = $("sugg");
+  box.innerHTML = suggItems.map((s, i) =>
+    `<div class="sugg-item" data-i="${i}"><span>${s.name} <span class="cat">· ${s.category}</span></span><span class="price">${fmt(s.price)}</span></div>`
+  ).join("");
+  box.style.display = suggItems.length ? "block" : "none";
+}
+$("q").addEventListener("input", (e) => doSearch(e.target.value));
+$("q").addEventListener("keydown", (e) => {
+  const box = $("sugg");
+  if (box.style.display !== "block" || !suggItems.length) {
+    if (e.key === "Escape") box.style.display = "none";
+    return;
+  }
+  const items = box.querySelectorAll(".sugg-item");
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    suggIdx = (suggIdx + (e.key === "ArrowDown" ? 1 : -1) + suggItems.length) % suggItems.length;
+    items.forEach((el, i) => el.classList.toggle("active", i === suggIdx));
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (suggIdx >= 0) pick(suggItems[suggIdx]); else if (suggItems.length) pick(suggItems[0]);
+  } else if (e.key === "Escape") {
+    box.style.display = "none";
+  }
+});
+$("sugg").addEventListener("mousedown", (e) => {
+  const it = e.target.closest(".sugg-item");
+  if (it) pick(suggItems[+it.dataset.i]);
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".sugg")) $("sugg").style.display = "none";
+});
+
+/* ---------- Чек ---------- */
+function pick(s) {
+  const ex = cart.find(c => c.code === s.code);
+  if (ex) ex.qty += 1; else cart.push({ ...s, qty: 1 });
+  $("q").value = ""; $("sugg").style.display = "none";
+  renderCart(); $("q").focus();
+}
+function renderCart() {
+  const tb = $("cartBody");
+  tb.innerHTML = cart.map((c, i) =>
+    `<tr><td>${c.name}</td><td class="num">${fmt(c.price)}</td>` +
+    `<td class="num"><input type="text" class="qty" data-i="${i}" value="${c.qty}"></td>` +
+    `<td class="num">${fmt(c.price * c.qty)}</td>` +
+    `<td><button class="row-del" data-i="${i}" title="Удалить строку">⛔</button></td></tr>`
+  ).join("");
+  const total = cart.reduce((a, c) => a + c.price * c.qty, 0);
+  $("total").textContent = fmt(total);
+}
+$("cartBody").addEventListener("change", (e) => {
+  const q = e.target.closest(".qty");
+  if (q) { cart[+q.dataset.i].qty = Math.max(1, parseInt(q.value) || 1); renderCart(); }
+  const d = e.target.closest(".row-del");
+  if (d) { cart.splice(+d.dataset.i, 1); renderCart(); }
+});
+$("cartBody").addEventListener("click", (e) => {
+  const d = e.target.closest(".row-del");
+  if (d) { cart.splice(+d.dataset.i, 1); renderCart(); }
+});
+
+/* ---------- Отчёт ---------- */
+function renderReport() {
+  $("sumCash").textContent = fmt(report.cash);
+  $("sumCard").textContent = fmt(report.card);
+  $("sumAll").textContent = fmt(report.cash + report.card);
+}
+function checkout(kind) {
+  const total = cart.reduce((a, c) => a + c.price * c.qty, 0);
+  if (total <= 0) return;
+  report[kind] += total;
+  cart = [];
+  renderCart(); renderReport();
+}
+$("btnCash").onclick = () => checkout("cash");
+$("btnCard").onclick = () => checkout("card");
+$("btnClear").onclick = () => { report = { cash: 0, card: 0 }; renderReport(); };
+
+/* ---------- Активация ключом ---------- */
+$("mid").onclick = () => navigator.clipboard.writeText($("midVal").textContent).catch(() => {});
+$("btnActivate").onclick = async () => {
+  $("lockErr").textContent = "";
+  try {
+    const r = await fetch("/api/activate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: $("keyInput").value })
+    });
+    if (r.ok) { licensed = true; $("lock").classList.remove("show"); }
+    else { const e = await r.json(); $("lockErr").textContent = e.detail || "Неверный ключ"; }
+  } catch (e) { $("lockErr").textContent = "Ошибка соединения"; }
+};
+$("keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnActivate").click(); });
+
+/* ---------- Старт ---------- */
+fetch("/api/state").then(r => r.json()).then(st => {
+  renderState(st);
+  if (!st.licensed && st.remaining > 0) setTimeout(showLock, 0);
+});
+setInterval(tickState, 5000);
+</script>
+</body>
+</html>
