@@ -36,7 +36,9 @@ def is_licensed() -> bool:
 def activate(key: str, machine_id: str) -> bool:
     from . import license as lic
 
-    if lic.check_key(lic.normalize_machine_id(machine_id), key):
+    # machine_id() приходит с дефисами (как в окне блокировки) — не нормализуем,
+    # check_key сам проверит обе формы (с дефисами и без).
+    if lic.check_key(machine_id, key):
         state = _load()
         state["licensed"] = True
         state["key"] = key

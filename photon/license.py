@@ -45,9 +45,14 @@ def make_universal_key(label: str = "demo-full") -> str:
 
 
 def check_key(machine_id: str, key: str) -> bool:
-    """Проверка ключа в приложении: обычный или универсальный."""
+    """Проверка ключа в приложении: обычный или универсальный.
+
+    Machine ID проверяем в обеих формах (с дефисами и без): клиент может
+    скопировать ID из письма в любом виде.
+    """
     key = (key or "").strip().upper().replace(" ", "").replace("-", "")
-    if machine_id and make_key(machine_id) == key:
+    mids = {machine_id, normalize_machine_id(machine_id)} - {""}
+    if key and any(make_key(m) == key for m in mids):
         return True
     # Универсальные ключи проверяем перебором известных меток.
     for label in ("demo-full", "shrumi", "photon"):

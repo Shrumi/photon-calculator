@@ -4,3 +4,5 @@ build/
 dist/
 *.spec.bak
 .DS_Store
+secrets.local.ps1
+state.json
