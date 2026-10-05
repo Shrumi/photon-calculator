@@ -6,3 +6,4 @@ dist/
 .DS_Store
 secrets.local.ps1
 state.json
+photon/_secret.py

@@ -21,8 +21,16 @@ MAGIC = "PH"
 
 
 def _secret() -> bytes:
+    # Приоритет: переменная окружения → приватный модуль (вшит в exe,
+    # не в git) → dev-фолдбек.
     env = os.environ.get(SECRET_ENV, "").strip()
-    return env.encode("utf-8") if env else _DEV_SECRET
+    if env:
+        return env.encode("utf-8")
+    try:
+        from ._secret import SECRET  # type: ignore[import-not-found]
+        return SECRET.encode("utf-8")
+    except ImportError:
+        return _DEV_SECRET
 
 
 def machine_fingerprint(secret: bytes, machine_id: str) -> str:
